@@ -1,10 +1,12 @@
 #include <Arduino.h>
+#include <Wire.h>
+#include <SparkFun_AS7343.h>
 #include <CmdMessenger.h>
 #include "dataModel.h"
 #include "df4MotorDriver.h"
 
-// Create a CmdMessenger object, passing in the hardware serial port and the command separators
 CmdMessenger cmdMessenger(Serial, ',', ';', '/');
+SfeAS7343ArdI2C sensor;
 
 // This is the list of recognized commands. These can be commands that can either be sent or received.
 // In order to receive, attach a callback function to these events
@@ -15,12 +17,13 @@ void OnGetState();
 void OnGetLastStep();
 void OnReceiveStep();
 void OnReceiveStop();
+void OnReadSensor();
+
 
 void returnState();
 void returnLastStep();
 void receiveStep();
 void receiveStop();
-
 
 // Command IDs for the commands we send from the Arduino and want to receive on the PC.
 enum
@@ -36,7 +39,9 @@ enum
   kStep,              // Command to receive a step (pump state + time), should always contain the full state of the pumps
   kStop,              // Command to stop all pumps
   kStepDone,          // Command to signal a step done
-
+  kReadSensor,
+  kSensorResult
+  
 };
 
 // Commands we send from the PC and want to receive on the Arduino.
@@ -50,9 +55,11 @@ void attachCommandCallbacks()
   cmdMessenger.attach(kGetLastStep, OnGetLastStep);
   cmdMessenger.attach(kStep, OnReceiveStep);
   cmdMessenger.attach(kStop, OnReceiveStop);
+  cmdMessenger.attach(kReadSensor, OnReadSensor); 
 }
 
 // ------------------  C A L L B A C K S -----------------------
+
 
 // Called when a received command has no attached function
 void OnUnknownCommand()
@@ -96,16 +103,44 @@ void OnReceiveStop()
   receiveStop();
 }
 
-void setup() {
-// Start the serial port
-  Serial.begin(115200);
-   // Setup the IO pins for the pumps and initialize the pump state
-  setupPumps();
+void OnReadSensor()
+{
+  uint16_t readings[18] = {0};
 
+  if (sensor.readSpectraDataFromSensor() &&
+      sensor.getData(readings, 18) == 18)
+  {
+    cmdMessenger.sendCmdStart(kSensorResult);
+    for (int i = 0; i < 18; i++)
+    {
+      cmdMessenger.sendCmdBinArg<uint16_t>(readings[i]);
+    }
+    cmdMessenger.sendCmdEnd();
+  }
+  else
+  {
+    cmdMessenger.sendCmd(kError, "Sensor read failed");
+  }
+}
+
+void setup() {
+  // Start the serial port
+  Serial.begin(115200);
+  Wire.begin();
+
+  if (!sensor.begin())
+  {
+    cmdMessenger.sendCmd(kError, "AS7343 initialization failed");
+  }
+
+
+  // Setup the IO pins for the pumps and initialize the pump state
+  setupPumps();
+  
   //  Do not print newLine at end of command,
   //  in order to reduce data being sent
   cmdMessenger.printLfCr(false);
-
+  
   // Attach my application's user-defined callback methods
   attachCommandCallbacks();
 
@@ -201,36 +236,25 @@ void receiveStep()
     currentStep.speedA = cmdMessenger.readBinArg<uint16_t>();
     currentStep.dirA = cmdMessenger.readBinArg<bool>();
     
+    currentStep.stateB = cmdMessenger.readBinArg<bool>();
+    currentStep.speedB = cmdMessenger.readBinArg<uint16_t>();
+    currentStep.dirB = cmdMessenger.readBinArg<bool>();
+    
+    currentStep.stateC = cmdMessenger.readBinArg<bool>();
+    currentStep.speedC = cmdMessenger.readBinArg<uint16_t>();
+    currentStep.dirC = cmdMessenger.readBinArg<bool>();
+    
+    currentStep.time = cmdMessenger.readBinArg<unsigned long>(); 
     // Change the state of pump A based on the received command
-    if (currentStep.stateA)
-    {
-      StartPumpA(currentStep.speedA, currentStep.dirA);
-    }
-    else
-    {
-      StopPumpA();
-    }
-    
-    // Set the state, speed, and direction of pump A in the global pumpA object of the data model to reflect the current state of the pump
-    pumpA.state = currentStep.stateA;
-    pumpA.speed = currentStep.speedA;
-    pumpA.dir = currentStep.dirA;
-
-    // Read the time argument from the command message and set the time of the current step accordingly
-    currentStep.time = cmdMessenger.readBinArg<unsigned long>();
-
-    // Set the state of the current step to true, indicating that a step is currently running, and set the done flag to false, indicating that the step has not yet completed. Also, record the start time of the step using the millis() function to track how long the step has been running.
+    if (currentStep.stateA) StartPumpA(currentStep.speedA, currentStep.dirA); else StopPumpA();
+    if (currentStep.stateB) StartPumpB(currentStep.speedB, currentStep.dirB); else StopPumpB();
+    if (currentStep.stateC) StartPumpC(currentStep.speedC, currentStep.dirC); else StopPumpC();
     currentStep.state = true;
-    currentStep.done = false;
-    currentStep.stepStartTime = millis();
+  currentStep.done = false;
+  currentStep.stepStartTime = millis();
 
-    // Send an acknowledgment message back to the PC indicating that the step command has been received and processed successfully
-    cmdMessenger.sendCmdStart(kAcknowledge);
-    cmdMessenger.sendCmdArg("Step");
-    
-    // Send the end of the message
-    cmdMessenger.sendCmdEnd();
-  }
+  cmdMessenger.sendCmd(kAcknowledge, "Step started");
+}
 }
 
 // Callback function that receives a stop command and stops all pumps
