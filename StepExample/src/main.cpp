@@ -59,8 +59,6 @@ void attachCommandCallbacks()
 }
 
 // ------------------  C A L L B A C K S -----------------------
-
-
 // Called when a received command has no attached function
 void OnUnknownCommand()
 {
