@@ -1,0 +1,6 @@
+fastapi[standard]
+pyserial
+pydantic
+httpx
+websockets 
+PyCmdMessenger>=0.2.4
