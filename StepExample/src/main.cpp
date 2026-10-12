@@ -122,7 +122,6 @@ void OnReadSensor()
 }
 
 void setup() {
-  // Start the serial port
   Serial.begin(115200);
   Wire.begin();
 
@@ -130,21 +129,21 @@ void setup() {
   {
     cmdMessenger.sendCmd(kError, "AS7343 initialization failed");
   }
+  else 
+  {
+    sensor.powerOn();
+    sensor.setAutoSmux(AUTOSMUX_18_CHANNELS); 
+    sensor.enableSpectralMeasurement();
 
+    // Turn the white illumination LED on permanently at a higher brightness
+    sensor.setLedDrive(20); // Range is 0 to 127. 20 is ~44mA. 
+    sensor.ledOn();
+  }
 
-  // Setup the IO pins for the pumps and initialize the pump state
   setupPumps();
-  
-  //  Do not print newLine at end of command,
-  //  in order to reduce data being sent
   cmdMessenger.printLfCr(false);
-  
-  // Attach my application's user-defined callback methods
   attachCommandCallbacks();
-
-  // Send a command to the PC to indicate that the Arduino has started
   cmdMessenger.sendCmd(kAcknowledge, "Arduino has started!");
- 
 }
 
 void loop() {

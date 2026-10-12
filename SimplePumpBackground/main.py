@@ -1,4 +1,4 @@
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI, BackgroundTasks,HTTPException
 from driver import RealMicrocontrollerService, get_logger
 import time
 import json
@@ -45,8 +45,16 @@ def get_status():
 @app.get("/sensor", summary="Read Sensor")
 def read_sensor():
     readings = micro.read_sensor()
-    return {"readings": readings}
-
+    
+    # Check if list is empty OR if every single value is 0
+    if not readings or all(v == 0 for v in readings):
+        return {
+            "status": "error", 
+            "message": "Sensor returned all zeros. Check if the sensor is covered, in the dark, or needs its LED turned on.",
+            "readings": readings
+        }
+        
+    return {"status": "success", "readings": readings}
 # --- Helper methods ---
 def send_command_to_hardware(pumpA, pumpB, pumpC, duration):
     stateA = pumpA.get("state", False) if pumpA else False

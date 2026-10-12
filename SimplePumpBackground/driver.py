@@ -44,7 +44,7 @@ class RealMicrocontrollerService:
             ["kStop", ""],
             ["kStepDone", ""],
             ["kReadSensor", ""],
-            ["kSensorResult", "18H"],
+            ["kSensorResult", "IIIIIIIIIIIIIIIIII"],
         ]
 
         self.comm = PyCmdMessenger.CmdMessenger(ESP32, commands)
@@ -61,6 +61,7 @@ class RealMicrocontrollerService:
             self.comm.send("kReadSensor")
             msg = self.comm.receive()
             if msg and msg[0] == "kSensorResult":
+                log.info(f"Message read:\n {msg} \ndone")
                 return list(msg[1])
             if msg and msg[0] == "kError":
                 log.error(f"Sensor error from Arduino: {msg[1]}")
