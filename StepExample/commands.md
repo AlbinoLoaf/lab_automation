@@ -8,10 +8,10 @@ curl -X 'POST' \
   "id": "run-motor-b",
   "pumpB": {
     "state": true,
-    "speed": 4095,
+    "speed": 4000,
     "dir": true
   },
-  "time": 3000
+  "time": 20000
 }'
 ```
 
