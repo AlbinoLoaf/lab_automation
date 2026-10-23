@@ -55,11 +55,42 @@ class LiquidTracker:
             print(f"Pump {p.upper()}: {ms / 1000:.1f} seconds")
 
 
+class SensorReadings:
+    def __init__(self, filepath: str):
+        self.filepath = filepath
+        self.data: Dict[str, tuple]
+        self._load()
+
+    def _load(self) -> None:
+        if os.path.exists(self.filepath):
+            try:
+                with open(self.filepath, "r", encoding="utf-8") as f:
+                    loaded = json.load(f)
+                    self.data.update(loaded)
+            except Exception as e:
+                print(
+                    f"Warning: Could not load sensor data: {e}", file=sys.stderr)
+
+    def _save(self) -> None:
+        try:
+            with open(self.filepath, "w", encoding="utf-8") as f:
+                json.dump(self.data, f, indent=4)
+        except Exception as e:
+            print(
+                f"Warning: Could not save tracker data: {e}", file=sys.stderr)
+
+    def add_reading(self, reading_nr, sensor_data) -> None:
+        self.data.update(reading_nr, sensor_data)
+        self._save()
+
+
 class RobotController:
     def __init__(self, base_url: str):
         self.base_url = base_url
-        path = f"tracking/{time.strftime('%d%m%Y_%H%M')}"
-        self.tracker = LiquidTracker(path)
+        time = time.strftime('%d%m%Y_%H%M')
+        self.tracker = LiquidTracker(f"tracking/{time}")
+        self.sensor_readings = SensorReadings(f"sensor_readings/{time}")
+        self.reading_nr = 1
 
     def wait_until_ready(self) -> None:
         """Blocks until the hardware is no longer busy."""
@@ -99,6 +130,7 @@ class RobotController:
     def read_sensor(self) -> list:
         """Retrieves the latest spectral sensor readings."""
         print("Requesting sensor data...", file=sys.stderr)
+
         try:
             resp = requests.get(
                 f"{self.base_url}/sensor",
@@ -112,6 +144,8 @@ class RobotController:
                 return data.get("readings", [])
 
             readings = data.get("readings", [])
+            self.sensor_readings.add_reading(self.reading_nr, readings)
+            self.reading_nr += 1
             return readings
 
         except Exception as e:
