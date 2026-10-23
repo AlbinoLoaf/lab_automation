@@ -1,0 +1,3 @@
+scikit-optimize
+matplotlib
+numpy
