@@ -84,7 +84,7 @@ class RobotController:
         payload[pump_key] = {
             "state": True,
             "speed": cfg.speed,
-            "dir": cfg.direction
+            "dir": not cfg.direction if cfg.pump.upper() == "A" else cfg.direction
         }
 
         print(f"Running Pump {cfg.pump.upper()} for {cfg.duration}ms...")
@@ -142,15 +142,22 @@ class RobotController:
 
         requests.post(f"{self.base_url}/actions", json=payload) """
         print(f"Running cleaning process)")
-
+        s = 4095
         reservoir_contains = self.tracker.data.get(
             "a") + self.tracker.data.get("b")
-        self.run_pump("c", 1, reservoir_contains)
+        self.run_pump(PumpConfig("c", 1, reservoir_contains,s))
         # Fill the reservoir tube a little, to remove the excess colored water stuck at the bottom.
-        self.run_pump("b", 1, 5000)
-        self.run_pump("c", 1, 8000)
+        self.run_pump(PumpConfig("b", 1, 5000,s))
+        self.run_pump(PumpConfig("c", 1, 8000,s))
         # Fill up the tube with clean water, empty it
-        self.run_pump("b", 1, 40000)
-        self.run_pump("c", 1, 45000)
+        self.run_pump(PumpConfig("b", 1, 40000,s))
+        self.run_pump(PumpConfig("c", 1, 45000,s))
 
         print("Cleaning done.")
+
+    def reset_robot(self) -> None:
+        self.clean()
+        s = 4095
+        self.run_pump(PumpConfig("a", 0, 5000,s))
+        self.run_pump(PumpConfig("b", 0, 5000,s))
+        

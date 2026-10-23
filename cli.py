@@ -40,6 +40,7 @@ def get_interactive_parser() -> argparse.ArgumentParser:
     clean_parser = subparsers.add_parser("clean", help="Run the cleaning sequence")
     stats_parser = subparsers.add_parser("stats", help="View liquid usage statistics")
     sensor_parser = subparsers.add_parser("sensor", help="Read the spectral sensor")
+    reset_parser = subparsers.add_parser("reset", help ="Clean system and empty pipes")
     return parser
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -94,7 +95,9 @@ def main(argv: Optional[list[str]] = None) -> int:
                 
             elif args.command == "clean":
                 controller.clean()
-                
+
+            elif args.command == "reset":
+                            controller.reset_robot()
             elif args.command == "stats":
                 tracker.print_stats()
 
