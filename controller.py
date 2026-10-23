@@ -7,6 +7,7 @@ import requests
 from dataclasses import dataclass
 from typing import Dict
 
+
 @dataclass
 class PumpConfig:
     pump: str
@@ -14,8 +15,10 @@ class PumpConfig:
     duration: int
     speed: int
 
+
 class LiquidTracker:
     """Tracks cumulative pump runtimes to estimate liquid usage."""
+
     def __init__(self, filepath: str):
         self.filepath = filepath
         self.data: Dict[str, int] = {"a": 0, "b": 0, "c": 0}
@@ -28,14 +31,16 @@ class LiquidTracker:
                     loaded = json.load(f)
                     self.data.update(loaded)
             except Exception as e:
-                print(f"Warning: Could not load tracker data: {e}", file=sys.stderr)
+                print(
+                    f"Warning: Could not load tracker data: {e}", file=sys.stderr)
 
     def _save(self) -> None:
         try:
             with open(self.filepath, "w", encoding="utf-8") as f:
                 json.dump(self.data, f, indent=4)
         except Exception as e:
-            print(f"Warning: Could not save tracker data: {e}", file=sys.stderr)
+            print(
+                f"Warning: Could not save tracker data: {e}", file=sys.stderr)
 
     def add_usage(self, pump: str, duration_ms: int) -> None:
         pump = pump.lower()
@@ -47,6 +52,7 @@ class LiquidTracker:
         print("--- Cumulative Pump Usage ---")
         for p, ms in self.data.items():
             print(f"Pump {p.upper()}: {ms / 1000:.1f} seconds")
+
 
 class RobotController:
     def __init__(self, base_url: str):
@@ -60,18 +66,19 @@ class RobotController:
                 if not resp.get("busy"):
                     return
             except requests.ConnectionError:
-                print(f"Error: Could not connect to {self.base_url}", file=sys.stderr)
+                print(
+                    f"Error: Could not connect to {self.base_url}", file=sys.stderr)
                 sys.exit(1)
             time.sleep(0.2)
 
     def run_pump(self, cfg: PumpConfig) -> None:
         self.wait_until_ready()
-        
+
         payload = {
             "id": str(uuid.uuid4()),
             "time": cfg.duration
         }
-        
+
         pump_key = f"pump{cfg.pump.upper()}"
         payload[pump_key] = {
             "state": True,
@@ -89,19 +96,19 @@ class RobotController:
         print("Requesting sensor data...", file=sys.stderr)
         try:
             resp = requests.get(
-                f"{self.base_url}/sensor", 
+                f"{self.base_url}/sensor",
                 headers={"accept": "application/json"}
             )
             resp.raise_for_status()
             data = resp.json()
-            
+
             if data.get("status") == "error":
                 print(f"Sensor Error: {data.get('message')}", file=sys.stderr)
                 return data.get("readings", [])
-                
+
             readings = data.get("readings", [])
             return readings
-            
+
         except Exception as e:
             print(f"Failed to fetch sensor readings: {e}", file=sys.stderr)
             return []
@@ -116,6 +123,25 @@ class RobotController:
             print(f"Failed to send stop command: {e}", file=sys.stderr)
 
     def clean(self) -> None:
-        """Future extensible cleaning routine."""
-        print("Initiating cleaning sequence...")
-        pass
+        self.wait_until_ready()
+
+        """ payload = {
+            "id": str(uuid.uuid4()),
+            "time": 30000
+        }
+
+        pump_key = f"c"
+        payload[pump_key] = {
+            "state": True,
+            "speed": 2000,
+            "dir": 1
+        }
+
+        requests.post(f"{self.base_url}/actions", json=payload) """
+        print(f"Running cleaning process (90 seconds...)")
+
+        self.run_pump("c", 1, 30000, 2000)
+        self.run_pump("b", 0, 30000, 2000)
+        self.run_pump("c", 1, 30000, 2000)
+
+        print("Cleaning done.")
