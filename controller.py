@@ -4,6 +4,7 @@ import sys
 import time
 import uuid
 import requests
+import time
 from dataclasses import dataclass
 from typing import Dict
 
@@ -57,7 +58,8 @@ class LiquidTracker:
 class RobotController:
     def __init__(self, base_url: str):
         self.base_url = base_url
-        self.tracker = LiquidTracker("tracking")
+        path = f"tracking/{time.strftime('%d%m%Y_%H%M')}"
+        self.tracker = LiquidTracker(path)
 
     def wait_until_ready(self) -> None:
         """Blocks until the hardware is no longer busy."""
@@ -145,19 +147,18 @@ class RobotController:
         s = 4095
         reservoir_contains = self.tracker.data.get(
             "a") + self.tracker.data.get("b")
-        self.run_pump(PumpConfig("c", 1, reservoir_contains,s))
+        self.run_pump(PumpConfig("c", 1, reservoir_contains, s))
         # Fill the reservoir tube a little, to remove the excess colored water stuck at the bottom.
-        self.run_pump(PumpConfig("b", 1, 5000,s))
-        self.run_pump(PumpConfig("c", 1, 8000,s))
+        self.run_pump(PumpConfig("b", 1, 5000, s))
+        self.run_pump(PumpConfig("c", 1, 8000, s))
         # Fill up the tube with clean water, empty it
-        self.run_pump(PumpConfig("b", 1, 40000,s))
-        self.run_pump(PumpConfig("c", 1, 45000,s))
+        self.run_pump(PumpConfig("b", 1, 40000, s))
+        self.run_pump(PumpConfig("c", 1, 45000, s))
 
         print("Cleaning done.")
 
     def reset_robot(self) -> None:
         self.clean()
         s = 4095
-        self.run_pump(PumpConfig("a", 0, 5000,s))
-        self.run_pump(PumpConfig("b", 0, 5000,s))
-        
+        self.run_pump(PumpConfig("a", 0, 5000, s))
+        self.run_pump(PumpConfig("b", 0, 5000, s))
