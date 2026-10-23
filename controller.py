@@ -84,6 +84,28 @@ class RobotController:
         self.wait_until_ready()
         print("Done.")
 
+    def read_sensor(self) -> list:
+        """Retrieves the latest spectral sensor readings."""
+        print("Requesting sensor data...", file=sys.stderr)
+        try:
+            resp = requests.get(
+                f"{self.base_url}/sensor", 
+                headers={"accept": "application/json"}
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            
+            if data.get("status") == "error":
+                print(f"Sensor Error: {data.get('message')}", file=sys.stderr)
+                return data.get("readings", [])
+                
+            readings = data.get("readings", [])
+            return readings
+            
+        except Exception as e:
+            print(f"Failed to fetch sensor readings: {e}", file=sys.stderr)
+            return []
+
     def stop(self) -> None:
         """Triggers the emergency stop endpoint."""
         print("\nEmergency stop requested...", file=sys.stderr)

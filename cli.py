@@ -37,14 +37,12 @@ def get_interactive_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("direction", type=parse_direction, help="Direction (in/ind/out/ud)")
     run_parser.add_argument("duration", type=int, help="Duration in milliseconds")
     run_parser.add_argument("--speed", type=int, default=4095, help="Motor speed (0-4095)")
-
     clean_parser = subparsers.add_parser("clean", help="Run the cleaning sequence")
     stats_parser = subparsers.add_parser("stats", help="View liquid usage statistics")
-
+    sensor_parser = subparsers.add_parser("sensor", help="Read the spectral sensor")
     return parser
 
 def main(argv: Optional[list[str]] = None) -> int:
-    # 1. Parse startup arguments
     startup_parser = argparse.ArgumentParser(description="Start the Interactive Lab Auto CLI")
     startup_parser.add_argument("--host", default="localhost", help="API server host (default: localhost)")
     startup_parser.add_argument("--port", type=int, default=8000, help="API server port (default: 8000)")
@@ -71,7 +69,6 @@ def main(argv: Optional[list[str]] = None) -> int:
             if user_input.lower() in ("help", "?"):
                 repl_parser.print_help()
                 continue
-
             try:
                 args = repl_parser.parse_args(shlex.split(user_input))
             except ValueError:
@@ -89,6 +86,10 @@ def main(argv: Optional[list[str]] = None) -> int:
                     speed=args.speed
                 )
                 controller.run_pump(cfg)
+            
+            elif args.command == "sensor":
+                readings = controller.read_sensor()
+                print(f"Readings: {readings}")
                 tracker.add_usage(cfg.pump, cfg.duration)
                 
             elif args.command == "clean":
