@@ -57,6 +57,7 @@ class LiquidTracker:
 class RobotController:
     def __init__(self, base_url: str):
         self.base_url = base_url
+        self.tracker = LiquidTracker("tracking")
 
     def wait_until_ready(self) -> None:
         """Blocks until the hardware is no longer busy."""
@@ -87,6 +88,8 @@ class RobotController:
         }
 
         print(f"Running Pump {cfg.pump.upper()} for {cfg.duration}ms...")
+        self.tracker.add_usage(cfg.pump.upper(), cfg.duration)
+
         requests.post(f"{self.base_url}/actions", json=payload)
         self.wait_until_ready()
         print("Done.")
@@ -138,10 +141,16 @@ class RobotController:
         }
 
         requests.post(f"{self.base_url}/actions", json=payload) """
-        print(f"Running cleaning process (90 seconds...)")
+        print(f"Running cleaning process)")
 
-        self.run_pump("c", 1, 30000, 2000)
-        self.run_pump("b", 0, 30000, 2000)
-        self.run_pump("c", 1, 30000, 2000)
+        reservoir_contains = self.tracker.data.get(
+            "a") + self.tracker.data.get("b")
+        self.run_pump("c", 1, reservoir_contains)
+        # Fill the reservoir tube a little, to remove the excess colored water stuck at the bottom.
+        self.run_pump("b", 1, 5000)
+        self.run_pump("c", 1, 8000)
+        # Fill up the tube with clean water, empty it
+        self.run_pump("b", 1, 40000)
+        self.run_pump("c", 1, 45000)
 
         print("Cleaning done.")
