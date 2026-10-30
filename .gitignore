@@ -1,7 +1,8 @@
 # Created by https://www.toptal.com/developers/gitignore/api/python,visualstudiocode,c++,platformio
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,visualstudiocode,c++,platformio
 
-tracker
+tracking/
+sensor_readings/
 ### C++ ###
 # Prerequisites
 *.d

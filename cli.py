@@ -4,9 +4,8 @@ import sys
 import shlex
 from typing import Optional
 
-from controller import PumpConfig, LiquidTracker, RobotController
+from controller import PumpConfig, RobotController
 
-TRACKER_FILE = "liquid_tracker.json"
 
 def parse_direction(val: str) -> bool:
     val = val.lower()
@@ -51,7 +50,6 @@ def main(argv: Optional[list[str]] = None) -> int:
     
     api_base = f"http://{startup_args.host}:{startup_args.port}"
     
-    tracker = LiquidTracker(TRACKER_FILE)
     controller = RobotController(api_base)
     repl_parser = get_interactive_parser()
 
@@ -87,17 +85,16 @@ def main(argv: Optional[list[str]] = None) -> int:
                     speed=args.speed
                 )
                 controller.run_pump(cfg)
-            
+                #tracker.add_usage(cfg.pump, cfg.duration)
             elif args.command == "sensor":
                 readings = controller.read_sensor()
                 print(f"Readings: {readings}")
-                tracker.add_usage(cfg.pump, cfg.duration)
                 
             elif args.command == "clean":
                 controller.clean()
 
             elif args.command == "reset":
-                            controller.reset_robot()
+                controller.reset_robot()
             elif args.command == "stats":
                 tracker.print_stats()
 

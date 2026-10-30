@@ -4,7 +4,6 @@ import sys
 import time
 import uuid
 import requests
-import time
 from dataclasses import dataclass
 from typing import Dict
 
@@ -30,13 +29,16 @@ class LiquidTracker:
             try:
                 with open(self.filepath, "r", encoding="utf-8") as f:
                     loaded = json.load(f)
-                    self.data.update(loaded)
+                    self.data = int(loaded)
             except Exception as e:
                 print(
                     f"Warning: Could not load tracker data: {e}", file=sys.stderr)
 
     def _save(self) -> None:
         try:
+            parent_dir = os.path.dirname(self.filepath)
+            if parent_dir:
+                os.makedirs(parent_dir, exist_ok=True)
             with open(self.filepath, "w", encoding="utf-8") as f:
                 json.dump(self.data, f, indent=4)
         except Exception as e:
@@ -45,20 +47,23 @@ class LiquidTracker:
 
     def add_usage(self, pump: str, duration_ms: int) -> None:
         pump = pump.lower()
-        if pump in self.data:
-            self.data[pump] += duration_ms
-            self._save()
+        if pump == "pumpc":
+            duration_ms = -duration_ms
+        if self.data + duration_ms > 0:
+            self.data += duration_ms
+        else:
+            self.data = 0
+        self._save()
 
     def print_stats(self) -> None:
-        print("--- Cumulative Pump Usage ---")
-        for p, ms in self.data.items():
-            print(f"Pump {p.upper()}: {ms / 1000:.1f} seconds")
+        print("--- Cumulative Liquid Tracker ---")
+        print(f"Current Volume: {self.data} ms")
 
 
 class SensorReadings:
     def __init__(self, filepath: str):
         self.filepath = filepath
-        self.data: Dict[str, tuple]
+        self.data: Dict[str, list] = {}
         self._load()
 
     def _load(self) -> None:
@@ -80,16 +85,16 @@ class SensorReadings:
                 f"Warning: Could not save tracker data: {e}", file=sys.stderr)
 
     def add_reading(self, reading_nr, sensor_data) -> None:
-        self.data.update(reading_nr, sensor_data)
+        self.data.update({reading_nr: sensor_data})
         self._save()
 
 
 class RobotController:
     def __init__(self, base_url: str):
         self.base_url = base_url
-        time = time.strftime('%d%m%Y_%H%M')
-        self.tracker = LiquidTracker(f"tracking/{time}")
-        self.sensor_readings = SensorReadings(f"sensor_readings/{time}")
+        curr_time = time.strftime('%d%m%Y_%H%M')
+        self.tracker = LiquidTracker(f"tracking/{curr_time}")
+        self.sensor_readings = SensorReadings(f"sensor_readings/{curr_time}")
         self.reading_nr = 1
 
     def wait_until_ready(self) -> None:
@@ -119,16 +124,11 @@ class RobotController:
             "speed": cfg.speed,
             "dir": not cfg.direction if cfg.pump.upper() == "A" else cfg.direction
         }
-
         print(f"Running Pump {cfg.pump.upper()} for {cfg.duration}ms...")
-
-        if (cfg.pump.upper() == "A" or "B"):
-            self.tracker.add_usage(cfg.duration)
-        if (cfg.pump.upper() == "C"):
-            self.tracker.add_usage(-cfg.duration)
 
         requests.post(f"{self.base_url}/actions", json=payload)
         self.wait_until_ready()
+        self.tracker.add_usage(pump_key,cfg.duration)
         print("Done.")
 
     def read_sensor(self) -> list:
