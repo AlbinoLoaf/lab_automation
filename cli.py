@@ -3,10 +3,9 @@ import argparse
 import sys
 import shlex
 from typing import Optional
+from controller import PumpConfig, RobotController
+from optimiser import ColorOptimizer, DEFAULT_TARGET
 
-from controller import PumpConfig, LiquidTracker, RobotController
-
-TRACKER_FILE = "liquid_tracker.json"
 
 def parse_direction(val: str) -> bool:
     val = val.lower()
@@ -41,6 +40,9 @@ def get_interactive_parser() -> argparse.ArgumentParser:
     stats_parser = subparsers.add_parser("stats", help="View liquid usage statistics")
     sensor_parser = subparsers.add_parser("sensor", help="Read the spectral sensor")
     reset_parser = subparsers.add_parser("reset", help ="Clean system and empty pipes")
+    opt_parser = subparsers.add_parser("optimize", help="Match a target spectrum using Bayesian Optimization")
+    opt_parser.add_argument("--target", "-t", type=float, nargs=18, default=DEFAULT_TARGET, help="18 space-separated target values (omit to use default target)")
+    opt_parser.add_argument("--calls", "-c", type=int, default=20,help="Total optimization steps (default: 10)")
     return parser
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -51,7 +53,6 @@ def main(argv: Optional[list[str]] = None) -> int:
     
     api_base = f"http://{startup_args.host}:{startup_args.port}"
     
-    tracker = LiquidTracker(TRACKER_FILE)
     controller = RobotController(api_base)
     repl_parser = get_interactive_parser()
 
@@ -87,19 +88,18 @@ def main(argv: Optional[list[str]] = None) -> int:
                     speed=args.speed
                 )
                 controller.run_pump(cfg)
-            
+                #tracker.add_usage(cfg.pump, cfg.duration)
             elif args.command == "sensor":
                 readings = controller.read_sensor()
                 print(f"Readings: {readings}")
-                tracker.add_usage(cfg.pump, cfg.duration)
                 
             elif args.command == "clean":
                 controller.clean()
 
             elif args.command == "reset":
-                            controller.reset_robot()
+                controller.reset_robot()
             elif args.command == "stats":
-                tracker.print_stats()
+                controller.tracker.print_stats()
 
         except KeyboardInterrupt:
             controller.stop()
