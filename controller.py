@@ -4,6 +4,7 @@ import sys
 import time
 import uuid
 import requests
+import time
 from dataclasses import dataclass
 from typing import Dict
 
@@ -21,7 +22,7 @@ class LiquidTracker:
 
     def __init__(self, filepath: str):
         self.filepath = filepath
-        self.data: Dict[str, int] = {"a": 0, "b": 0, "c": 0}
+        self.data: int = 0
         self._load()
 
     def _load(self) -> None:
@@ -54,10 +55,42 @@ class LiquidTracker:
             print(f"Pump {p.upper()}: {ms / 1000:.1f} seconds")
 
 
+class SensorReadings:
+    def __init__(self, filepath: str):
+        self.filepath = filepath
+        self.data: Dict[str, tuple]
+        self._load()
+
+    def _load(self) -> None:
+        if os.path.exists(self.filepath):
+            try:
+                with open(self.filepath, "r", encoding="utf-8") as f:
+                    loaded = json.load(f)
+                    self.data.update(loaded)
+            except Exception as e:
+                print(
+                    f"Warning: Could not load sensor data: {e}", file=sys.stderr)
+
+    def _save(self) -> None:
+        try:
+            with open(self.filepath, "w", encoding="utf-8") as f:
+                json.dump(self.data, f, indent=4)
+        except Exception as e:
+            print(
+                f"Warning: Could not save tracker data: {e}", file=sys.stderr)
+
+    def add_reading(self, reading_nr, sensor_data) -> None:
+        self.data.update(reading_nr, sensor_data)
+        self._save()
+
+
 class RobotController:
     def __init__(self, base_url: str):
         self.base_url = base_url
-        self.tracker = LiquidTracker("tracking")
+        time = time.strftime('%d%m%Y_%H%M')
+        self.tracker = LiquidTracker(f"tracking/{time}")
+        self.sensor_readings = SensorReadings(f"sensor_readings/{time}")
+        self.reading_nr = 1
 
     def wait_until_ready(self) -> None:
         """Blocks until the hardware is no longer busy."""
@@ -88,7 +121,11 @@ class RobotController:
         }
 
         print(f"Running Pump {cfg.pump.upper()} for {cfg.duration}ms...")
-        self.tracker.add_usage(cfg.pump.upper(), cfg.duration)
+
+        if (cfg.pump.upper() == "A" or "B"):
+            self.tracker.add_usage(cfg.duration)
+        if (cfg.pump.upper() == "C"):
+            self.tracker.add_usage(-cfg.duration)
 
         requests.post(f"{self.base_url}/actions", json=payload)
         self.wait_until_ready()
@@ -97,6 +134,7 @@ class RobotController:
     def read_sensor(self) -> list:
         """Retrieves the latest spectral sensor readings."""
         print("Requesting sensor data...", file=sys.stderr)
+
         try:
             resp = requests.get(
                 f"{self.base_url}/sensor",
@@ -110,6 +148,8 @@ class RobotController:
                 return data.get("readings", [])
 
             readings = data.get("readings", [])
+            self.sensor_readings.add_reading(self.reading_nr, readings)
+            self.reading_nr += 1
             return readings
 
         except Exception as e:
@@ -143,21 +183,21 @@ class RobotController:
         requests.post(f"{self.base_url}/actions", json=payload) """
         print(f"Running cleaning process)")
         s = 4095
-        reservoir_contains = self.tracker.data.get(
-            "a") + self.tracker.data.get("b")
-        self.run_pump(PumpConfig("c", 1, reservoir_contains,s))
+        reservoir_contains = self.tracker.data
+        self.run_pump(PumpConfig("c", 1, reservoir_contains, s))
         # Fill the reservoir tube a little, to remove the excess colored water stuck at the bottom.
-        self.run_pump(PumpConfig("b", 1, 5000,s))
-        self.run_pump(PumpConfig("c", 1, 8000,s))
+        self.run_pump(PumpConfig("b", 1, 5000, s))
+        self.run_pump(PumpConfig("c", 1, 8000, s))
         # Fill up the tube with clean water, empty it
-        self.run_pump(PumpConfig("b", 1, 40000,s))
-        self.run_pump(PumpConfig("c", 1, 45000,s))
+        self.run_pump(PumpConfig("b", 1, 40000, s))
+        self.run_pump(PumpConfig("c", 1, 45000, s))
+
+        self.tracker.data = 0
 
         print("Cleaning done.")
 
     def reset_robot(self) -> None:
         self.clean()
         s = 4095
-        self.run_pump(PumpConfig("a", 0, 5000,s))
-        self.run_pump(PumpConfig("b", 0, 5000,s))
-        
+        self.run_pump(PumpConfig("a", 0, 5000, s))
+        self.run_pump(PumpConfig("b", 0, 5000, s))
