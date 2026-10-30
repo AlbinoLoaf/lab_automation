@@ -22,7 +22,7 @@ class LiquidTracker:
 
     def __init__(self, filepath: str):
         self.filepath = filepath
-        self.data: Dict[str, int] = {"a": 0, "b": 0, "c": 0}
+        self.data: int = 0
         self._load()
 
     def _load(self) -> None:
@@ -121,7 +121,11 @@ class RobotController:
         }
 
         print(f"Running Pump {cfg.pump.upper()} for {cfg.duration}ms...")
-        self.tracker.add_usage(cfg.pump.upper(), cfg.duration)
+
+        if (cfg.pump.upper() == "A" or "B"):
+            self.tracker.add_usage(cfg.duration)
+        if (cfg.pump.upper() == "C"):
+            self.tracker.add_usage(-cfg.duration)
 
         requests.post(f"{self.base_url}/actions", json=payload)
         self.wait_until_ready()
@@ -179,8 +183,7 @@ class RobotController:
         requests.post(f"{self.base_url}/actions", json=payload) """
         print(f"Running cleaning process)")
         s = 4095
-        reservoir_contains = self.tracker.data.get(
-            "a") + self.tracker.data.get("b")
+        reservoir_contains = self.tracker.data
         self.run_pump(PumpConfig("c", 1, reservoir_contains, s))
         # Fill the reservoir tube a little, to remove the excess colored water stuck at the bottom.
         self.run_pump(PumpConfig("b", 1, 5000, s))
@@ -188,6 +191,8 @@ class RobotController:
         # Fill up the tube with clean water, empty it
         self.run_pump(PumpConfig("b", 1, 40000, s))
         self.run_pump(PumpConfig("c", 1, 45000, s))
+
+        self.tracker.data = 0
 
         print("Cleaning done.")
 
